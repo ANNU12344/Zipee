@@ -140,3 +140,19 @@ def remove_task(id):
     task = Task.query.get_or_404(id)
     delete_task(task)
     return jsonify({"message": "Task deleted successfully."})
+
+
+@task_routes.route("/tasks/completed", methods=["GET"])
+def get_completed_tasks():
+    """
+    Get All Completed Tasks
+    ---
+    tags:
+      - Tasks
+    responses:
+      200:
+        description: List of completed tasks
+    """
+    completed_tasks = Task.query.filter_by(completed=True).all()
+    return jsonify([t.to_dict() for t in completed_tasks])
+
