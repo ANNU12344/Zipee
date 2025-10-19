@@ -1,22 +1,18 @@
 from flask import Blueprint, request, jsonify
 from models.db_models import DBService
 from utils.auth_decorator import token_required, admin_required
+from utils.logger import logger
 
 task_routes = Blueprint("task_routes", __name__)
 
-# === Get All Tasks ===
-# @task_routes.route("/tasks", methods=["GET"])
-# @token_required  # both admin & user
-# def get_tasks():
-#     db = DBService.get_db()
-#     tasks = db.get_all_tasks()
-#     return jsonify(tasks), 200
 
+# Routes to get the lsit of all the tasks 
 @task_routes.route("/tasks", methods=["GET"])
 @token_required
 def get_tasks():
-    db = DBService.get_db()
-    tasks = db.get_all_tasks()
+    logger.info(f"Get list of all the task")
+    db = DBService.get_db()  # db connection 
+    tasks = db.get_all_tasks() # call the get_all_task function to get the list of the all the task return the list 
 
     # Get query params for pagination
     page = int(request.args.get("page", 1))
@@ -46,7 +42,7 @@ def get_task(id):
     return jsonify(task), 200
 
 # === Create a New Task ===
-@task_routes.route("/tasks", methods=["POST"])
+@task_routes.route("/create_tasks", methods=["POST"])
 @token_required
 @admin_required  # only admin
 def add_task():
