@@ -1,60 +1,64 @@
 from flask import request, jsonify
-from extensions import db, bcrypt
-from sqlalchemy import text
+from models.db_models import DBService
+from passlib.hash import bcrypt
 from flask_jwt_extended import create_access_token
+from datetime import datetime, timedelta
+from dotenv import load_dotenv
+from models.db_models import DBService
+import jwt
+import os
 
-# 1️⃣ Create users table if not exists
-def create_users_table():
-    print("*********************************************")
-    query = """
-    CREATE TABLE IF NOT EXISTS users (
-        id INT PRIMARY KEY AUTO_INCREMENT,
-        username VARCHAR(50) NOT NULL,
-        email VARCHAR(100) UNIQUE NOT NULL,
-        password VARCHAR(200) NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-    """
-    with db.engine.begin() as conn:  # use begin() to auto-commit
-        conn.execute(text(query))
-    print("Users table ensured.")
+# === Load environment variables ===
+load_dotenv()
+jwt_secret = os.getenv("JWT_SECRET_KEY")
 
-# 2️⃣ Register user
+
 def register_user():
-    create_users_table()  # ensure table exists
+    db = DBService.get_db()
     data = request.json
-    email = data["email"]
+    email = data.get("email")
+    password = data.get("password")
+    role = data.get("role", "user")  # default role = 'user'
+
+    if not email or not password:
+        return jsonify({"message": "Email and password are required"}), 400
 
     # Check if user exists
-    query = "SELECT * FROM users WHERE email = :email LIMIT 1;"
-    with db.engine.connect() as conn:
-        result = conn.execute(text(query), {"email": email}).fetchone()
-
-    if result:
+    existing_user = db.get_user_by_email(email)
+    if existing_user:
         return jsonify({"message": "Email already registered"}), 400
 
-    hashed = bcrypt.generate_password_hash(data["password"]).decode('utf-8')
-    insert_query = """
-    INSERT INTO users (username, email, password) 
-    VALUES (:username, :email, :password)
-    """
-    with db.engine.begin() as conn:  # begin() will commit automatically
-        conn.execute(text(insert_query), {"username": data["username"], "email": email, "password": hashed})
+    # Insert user with role
+    success, user_id = db.insert_user(email, password, role=role)
+    if not success:
+        return jsonify({"message": "Failed to register user"}), 500
 
-    return jsonify({"message": "User registered successfully"}), 201
+    return jsonify({"message": "User registered successfully", "user_id": user_id}), 201
 
-# 3️⃣ Login user
+
+# ===== Login User =====
 def login_user():
+    db = DBService.get_db()
     data = request.json
-    email = data["email"]
-    password = data["password"]
+    email = data.get("email")
+    password = data.get("password")
 
-    query = "SELECT * FROM users WHERE email = :email LIMIT 1;"
-    with db.engine.connect() as conn:
-        result = conn.execute(text(query), {"email": email}).fetchone()
+    if not email or not password:
+        return jsonify({"message": "Email and password required"}), 400
 
-    if not result or not bcrypt.check_password_hash(result.password, password):
+    # Get user by email
+    user = db.get_user_by_email(email)
+    if not user or not db.check_user_password(email, password):
         return jsonify({"message": "Invalid credentials"}), 401
 
-    access_token = create_access_token(identity=result.id)
-    return jsonify({"access_token": access_token})
+    # Create JWT payload
+    payload = {
+        "user_id": user["id"],
+        "role": user["role"],
+        "exp": datetime.utcnow() + timedelta(hours=12)  # token expires in 12 hours
+    }
+
+    # Encode JWT
+    access_token = jwt.encode(payload, jwt_secret, algorithm="HS256")
+
+    return jsonify({"access_token": access_token}), 200

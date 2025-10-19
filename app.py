@@ -2,13 +2,16 @@ from flask import Flask
 from extensions import db, migrate
 from routes.task_routes import task_routes
 from routes.auth_routes import auth_routes
+# from routes.auth_routes import auth_routes
 from flask_jwt_extended import JWTManager
 from flasgger import Swagger
 from dotenv import load_dotenv
+from models.db_models import DBService
 import os
 
-# === Load .env file ===
+# === Load environment variables ===
 load_dotenv()
+
 
 def create_app():
     app = Flask(__name__)
@@ -20,28 +23,43 @@ def create_app():
     db_name = os.getenv("DB_NAME")
     jwt_secret = os.getenv("JWT_SECRET_KEY")
 
+    print(f"Username: {db_username}, Password: {db_password}, Host: {db_host}, DB: {db_name}")
+
     app.config["SQLALCHEMY_DATABASE_URI"] = f"mysql+pymysql://{db_username}:{db_password}@{db_host}/{db_name}"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["JWT_SECRET_KEY"] = jwt_secret
-    app.config['SWAGGER'] = {
-        'title': 'Task Management API',
-        'uiversion': 3
+    app.config["SWAGGER"] = {
+        "title": "Task Management API",
+        "uiversion": 3
     }
 
-    # === Initialize extensions ===
+    # === Initialize Extensions ===
     db.init_app(app)
     migrate.init_app(app, db)
     JWTManager(app)
-
-    # === Initialize Swagger ===
     Swagger(app)
 
-    # === Register blueprints ===
+    # === Register Blueprints ===
     app.register_blueprint(auth_routes)
     app.register_blueprint(task_routes)
 
+
+    # === Lifecycle Hooks ===
+    with app.app_context():
+        print("🚀 Starting up DBService...")
+        DBService.init()
+
+    # @app.teardown_appcontext
+    # def shutdown_event(exception=None):
+    #     """Close DB connection at app shutdown"""
+    #     if DBService.db:
+    #         DBService.db.close()
+    #         print("🛑 MySQL connection closed")
+
     return app
 
+
+# === Create app instance ===
 app = create_app()
 
 if __name__ == "__main__":
