@@ -2,7 +2,6 @@ from flask import Flask
 from extensions import db, migrate
 from routes.task_routes import task_routes
 from routes.auth_routes import auth_routes
-# from routes.auth_routes import auth_routes
 from flask_jwt_extended import JWTManager
 from flasgger import Swagger
 from dotenv import load_dotenv
@@ -21,17 +20,13 @@ def create_app():
     db_password = os.getenv("DB_PASSWORD")
     db_host = os.getenv("DB_HOST")
     db_name = os.getenv("DB_NAME")
-    jwt_secret = os.getenv("JWT_SECRET_KEY")
+    #
 
     print(f"Username: {db_username}, Password: {db_password}, Host: {db_host}, DB: {db_name}")
 
     app.config["SQLALCHEMY_DATABASE_URI"] = f"mysql+pymysql://{db_username}:{db_password}@{db_host}/{db_name}"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-    app.config["JWT_SECRET_KEY"] = jwt_secret
-    app.config["SWAGGER"] = {
-        "title": "Task Management API",
-        "uiversion": 3
-    }
+    
 
     # === Initialize Extensions ===
     db.init_app(app)
@@ -48,13 +43,6 @@ def create_app():
     with app.app_context():
         print("🚀 Starting up DBService...")
         DBService.init()
-
-    # @app.teardown_appcontext
-    # def shutdown_event(exception=None):
-    #     """Close DB connection at app shutdown"""
-    #     if DBService.db:
-    #         DBService.db.close()
-    #         print("🛑 MySQL connection closed")
 
     return app
 
